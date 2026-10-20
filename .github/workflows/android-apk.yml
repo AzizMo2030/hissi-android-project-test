@@ -44,9 +44,23 @@ jobs:
       - name: Build static web app (SPA mode)
         run: CAPACITOR=1 bun run build
 
+      # Outside Lovable, nitro writes to .output/public instead of dist/client; normalize to
+      # Capacitor's webDir, then render "/" from the server entry if no HTML page exists.
       - name: Prepare index.html for Capacitor
         run: |
-          if [ ! -f dist/client/index.html ]; then cp dist/client/_shell.html dist/client/index.html; fi
+          if [ ! -d dist/client ] && [ -d .output/public ]; then
+            mkdir -p dist && cp -r .output/public dist/client && cp -r .output/server dist/server
+          fi
+          if [ ! -f dist/client/index.html ] && [ -f dist/client/_shell.html ]; then cp dist/client/_shell.html dist/client/index.html; fi
+          if [ ! -f dist/client/index.html ]; then
+            node --input-type=module -e '
+              const m = await import(process.cwd() + "/dist/server/index.mjs");
+              const h = m.default?.fetch ?? m.default;
+              const r = await h(new Request("http://localhost/"), {}, { waitUntil() {}, passThroughOnException() {} });
+              if (!r.ok) throw new Error("render failed: " + r.status);
+              (await import("node:fs")).writeFileSync("dist/client/index.html", await r.text());
+            '
+          fi
           test -s dist/client/index.html
           ls dist/client
 
