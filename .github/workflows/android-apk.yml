@@ -29,16 +29,14 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      # The default package list includes the obsolete "tools" package, which fails.
-      - uses: android-actions/setup-android@v3
-        with:
-          packages: ""
-
+      # ubuntu-latest ships the Android SDK; setup-android@v3 fails on the obsolete "tools" package.
       # Match Capacitor 8's compile SDK and AGP 8.13 default build tools.
       - name: Install Android SDK packages
         run: |
-          yes | sdkmanager --licenses > /dev/null || true
-          sdkmanager "platforms;android-36" "build-tools;35.0.0" "platform-tools"
+          SDKM=$(ls -d "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | sort -V | tail -1)
+          echo "Using $SDKM"
+          yes | "$SDKM" --licenses > /dev/null || true
+          "$SDKM" "platforms;android-36" "build-tools;35.0.0" "platform-tools"
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
